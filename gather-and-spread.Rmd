@@ -1,0 +1,90 @@
+---
+title: "Gather And Spread: Using the tidyverse to go between wide and long"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# The problem
+
+Frequently data you receive or create will be in formats that are unsuitable for analysis as they stand and require modification in some way.  This process is known as "tidying", or perhaps "munging".  The goal is generally to get the data into a "tidy" format: one row per case, one column per field, and one cell per value.  (You can read more about "tidy" data [here](http://garrettgman.github.io/tidying/).)
+
+One of the most common examples of this issue encountered is data where things that should be in the rows are in the columns or vice versa.  It's generally not a transpose, either; some of the content is right where you want it, but not all of it.  In these cases, we need to rearrange the data we've received into a form that is easier to deal with.  The two commands we want to look at today are `gather` (move columns into rows) and `spread` (move rows into columns).  We're going to use the functions in `tidyr`, part of the `tidyverse` packages; though, as with many tasks in R, there are a number of other packages with similar functionality you could use instead.
+
+## The example
+To start with, we'll need some untidy data.  For this, we'll use some data showing the general reasons people were admitted to hospital by financial year from July 1993 to June 1998.
+
+```{r message=FALSE}
+library(tidyverse)
+seps <- read_csv("hospitals93to98.csv")
+```
+```{r}
+head(seps)
+```
+
+As you can see, the data isn't in a great shape for analysis.  The years are in columns, which is fine for side-by-side eyeballing, but terrible for charting or similar; and the bed days and separations counts are muddled together.  That's going to make it hard to work with.
+
+# The solution
+## Wide to long
+Let's start by fixing the year issue.  To push data that is currently in columns into rows, we need to use the `gather()` command:
+
+`gather(data, key, value, ..., na.rm = FALSE, convert = FALSE)`
+
+* `data`: The dataset to be modified (in our case, `seps`)
+* `key`: the name of the new "naming" variable (`year`)
+* `value`: the name of the new "result" variable (`value`)
+* `na.rm`: whether missing values are removed (this dataset doesn't have any, so it isn't a problem)
+* `convert`: convert anything that seems like it should be in another format to that other format, e.g. numeric to numeric (since we used `read_csv` we don't need this one either)
+
+So, to move the years into a column, we'll run this:
+```{r}
+inprogress<-gather(seps,year,value,FY1993:FY1998)
+head(inprogress)
+```
+
+Okay, this is starting to look at little more like it should.  We still have the bed days and separations merged, but at least we've pulled together the years.  
+
+## Long to wide
+Next, let's pull the values into their own columns.  For this, we need `spread()`:
+
+`spread(data, key, value, fill = NA, convert = FALSE)`
+
+The format of this one is similar to `gather()`:
+
+* `data`: The data to be reformatted (`inprogress`)
+* `key`: The column you want to split apart (`Field`)
+* `value`: The column you want to use to populate the new columns (the `value` column we just created in the spread step)
+* `fill`: what to substitute if there are combinations that don't exist (not a problem here)
+* `convert`: whether to fix incorrect data types as it goes (not a problem here)
+
+So, the resulting command would look like this:
+```{r}
+rearranged <- spread(inprogress,Field,value)
+head(rearranged)
+```
+
+That looks much better, doesn't it?  
+
+## In One Step
+Because this is using `tidyverse` packages, we can also use the `magrittr` package's pipe command (`%>%`) to do this all in one step if preferred:
+
+```{r}
+seps %>%
+  gather(year,value,FY1993:FY1998) %>%
+  spread(Field,value)
+```
+
+Happy analysis!
+
+# Bibliography/Further Reading:
+
+The data used as an example was pulled from the Australian Institute of Health and Welfare Principal Diagnosis Data Cubes.  These data cubes can be accessed here: <http://www.aihw.gov.au/hospitals-data/principal-diagnosis-data-cubes/>
+
+The content itself is based on these sources:
+
+* Brad Boehmke's post "Data Processing with dplyr & tidyr": <https://rpubs.com/bradleyboehmke/data_wrangling>
+*	The RStudio blog's article "Introducing tidyr": <https://blog.rstudio.org/2014/07/22/introducing-tidyr/>
+*	The R for Data Science section on "Spreading and gathering".  This is available as a hard copy book, or online here: <http://r4ds.had.co.nz/tidy-data.html#spreading-and-gathering>
+*	The "Data tidying" section of "Data Science With R", the predecessor to R for Data Science.  You can access it here: <http://garrettgman.github.io/tidying/>
